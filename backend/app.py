@@ -9,7 +9,18 @@ current_id = 1
 
 @app.route('/todos', methods=['GET'])
 def get_todos():
-    return jsonify(sorted(todos, key=lambda x: x['position']))
+    status = request.args.get('completed')
+    search = request.args.get('search', '').lower()
+    filtered_todos = todos
+    if status == 'true':
+        filtered_todos = [todo for todo in todos if todo['completed']]
+    elif status == 'false':
+        filtered_todos = [todo for todo in todos if not todo['completed']]
+    if search:
+        filtered_todos = [todo for todo in filtered_todos if search in todo['task'].lower()]
+
+    return jsonify(sorted(filtered_todos, key=lambda x: x['position']))
+
 
 @app.route('/todos', methods=['POST'])
 def add_todo():

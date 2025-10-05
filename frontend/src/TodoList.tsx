@@ -1,22 +1,20 @@
 import { useEffect, useState } from 'react';
-import { FaTrash, FaGripVertical } from 'react-icons/fa';
 import {
   DragDropContext,
   Droppable,
   Draggable,
   type DropResult,
 } from '@hello-pangea/dnd';
-
-interface Todo {
-  id: number;
-  task: string;
-  completed: boolean;
-  position: number;
-}
+import type { Todo } from './types';
+import TodoFilters from './components/TodoFilters';
+import TodoForm from './components/TodoForm';
+import TodoSearch from './components/TodoSearch';
+import TodoItem from './components/TodoItem';
 
 export default function TodoList() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTask, setNewTask] = useState('');
+  const [searchParam, setSearchParam] = useState('');
 
   useEffect(() => {
     fetch('http://127.0.0.1:5000/todos')
@@ -24,7 +22,20 @@ export default function TodoList() {
       .then((data) => setTodos(data));
   }, []);
 
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      let url = 'http://127.0.0.1:5000/todos';
+      if (searchParam) url += `?search=${encodeURIComponent(searchParam)}`;
+      fetch(url)
+        .then((res) => res.json())
+        .then((data) => setTodos(data));
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchParam]);
+
   const addTodo = async () => {
+    // if (!newTask.trim()) return;
     const res = await fetch('http://127.0.0.1:5000/todos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -56,6 +67,16 @@ export default function TodoList() {
     }
   };
 
+  const filterTodos = (status: 'all' | 'completed' | 'incomplete') => {
+    let url = 'http://127.0.0.1:5000/todos';
+    if (status === 'completed') url += '?completed=true';
+    if (status === 'incomplete') url += '?completed=false';
+
+    fetch(url)
+      .then((res) => res.json())
+      .then((data) => setTodos(data));
+  };
+
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
 
@@ -76,26 +97,9 @@ export default function TodoList() {
   return (
     <div className="p-4 max-w-md mx-auto">
       <h1 className="text-6xl font-bold mb-8">To-Do List</h1>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          addTodo();
-        }}
-        className="flex gap-2 justify-center"
-      >
-        <input
-          type="text"
-          value={newTask}
-          onChange={(e) => setNewTask(e.target.value)}
-          className="border border-gray-600 rounded-sm p-2 flex-grow focus:outline-none focus:ring-2 focus:ring-blue-950"
-        />
-        <button
-          type="submit"
-          className="bg-blue-500 text-white px-4 rounded-sm hover:cursor-pointer hover:bg-blue-900"
-        >
-          Add
-        </button>
-      </form>
+      <TodoForm newTask={newTask} setNewTask={setNewTask} addTodo={addTodo} />
+      <TodoFilters filterTodos={filterTodos} />
+      <TodoSearch searchParam={searchParam} setSearchParam={setSearchParam} />
       <DragDropContext onDragEnd={handleDragEnd}>
         <Droppable droppableId="todos">
           {(provided) => (
@@ -111,32 +115,12 @@ export default function TodoList() {
                   index={index}
                 >
                   {(provided) => (
-                    <div
-                      className={`p-2 rounded-sm text-left flex gap-4 items-center justify-between ${
-                        todo.completed ? 'line-through' : ''
-                      } hover:bg-gray-700`}
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                    >
-                      <div className="flex gap-4 items-center">
-                        <div
-                          {...provided.dragHandleProps}
-                          className="hover:cursor-grab"
-                        >
-                          <FaGripVertical />
-                        </div>
-                        <div
-                          onClick={() => toggleTodo(todo.id)}
-                          className="cursor-pointer flex-grow"
-                        >
-                          {todo.task}
-                        </div>
-                      </div>
-                      <FaTrash
-                        className="text-red-500 hover:text-red-900 cursor-pointer"
-                        onClick={() => deleteTodo(todo.id)}
-                      />
-                    </div>
+                    <TodoItem
+                      todo={todo}
+                      provided={provided}
+                      toggleTodo={toggleTodo}
+                      deleteTodo={deleteTodo}
+                    />
                   )}
                 </Draggable>
               ))}
